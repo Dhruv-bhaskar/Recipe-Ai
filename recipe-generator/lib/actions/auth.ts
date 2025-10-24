@@ -1,3 +1,6 @@
+export const runtime = 'edge'
+export const preferredRegion = 'bom1'
+
 'use server'
 
 import { createClient } from '@/lib/supabase/server'

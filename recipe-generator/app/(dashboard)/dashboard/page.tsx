@@ -1,3 +1,6 @@
+export const runtime = 'edge'
+export const preferredRegion = 'bom1'
+
 import { getUser } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import {
