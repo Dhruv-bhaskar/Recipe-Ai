@@ -1,5 +1,6 @@
 'use client'
 
+import { toast } from 'sonner'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -64,6 +65,7 @@ export default function GenerateRecipePage() {
       setError(result.error)
     } else if (result.recipe) {
       // Redirect to the generated recipe
+      toast.success('Meal generated successfully!')
       router.push(`/recipes/${result.recipe.id}`)
     }
   }
