@@ -1,8 +1,8 @@
-export const runtime = 'edge'
-export const preferredRegion = 'bom1'
+'use client'
 
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { getUser } from "@/lib/actions/auth";
-import { createClient } from "@/lib/supabase/server";
 import {
   Card,
   CardContent,
@@ -12,31 +12,56 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ChefHat, Calendar, BookOpen, Heart } from "lucide-react";
+import { ChefHat, Calendar, BookOpen, Heart, Loader2 } from "lucide-react";
 
-export default async function DashboardPage() {
-  const user = await getUser();
-  const supabase = await createClient();
+export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null)
+  const [recipeCount, setRecipeCount] = useState(0)
+  const [favoriteCount, setFavoriteCount] = useState(0)
+  const [mealPlanCount, setMealPlanCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Get user's recipe count
-  const { count: recipeCount } = await supabase
-    .from("recipes")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user!.id);
+  useEffect(() => {
+    async function fetchData() {
+      const supabase = createClient()
+      
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
 
-  // Get favorite count
-  const { count: favoriteCount } = await supabase
-    .from("recipes")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user!.id)
-    .eq("is_favorite", true);
+      setUser(user)
 
-  // Get upcoming meal plans
-  const { count: mealPlanCount } = await supabase
-    .from("meal_plans")
-    .select("*", { count: "exact", head: true })
-    .eq("user_id", user!.id)
-    .gte("planned_date", new Date().toISOString().split("T")[0]);
+      // Get counts
+      const { count: recipes } = await supabase
+        .from('recipes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+
+      const { count: favorites } = await supabase
+        .from('recipes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_favorite', true)
+
+      const { count: mealPlans } = await supabase
+        .from('meal_plans')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('planned_date', new Date().toISOString().split('T')[0])
+
+      setRecipeCount(recipes || 0)
+      setFavoriteCount(favorites || 0)
+      setMealPlanCount(mealPlans || 0)
+      setIsLoading(false)
+    }
+
+    fetchData()
+  }, [])
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin" />
+    </div>
+  }
 
   return (
     <div className="space-y-6">

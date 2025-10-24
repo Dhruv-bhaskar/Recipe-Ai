@@ -1,3 +1,6 @@
+export const runtime = 'edge'
+export const preferredRegion = 'bom1'
+
 import { Button } from '@/components/ui/button'
 import { ChefHat } from 'lucide-react'
 import Link from 'next/link'

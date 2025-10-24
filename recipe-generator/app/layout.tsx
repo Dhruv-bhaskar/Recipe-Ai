@@ -1,34 +1,30 @@
+import type { Metadata } from "next"
+import { Inter } from "next/font/google"
+import { Providers } from '@/components/providers'
 import { Toaster } from 'sonner'
-import { Inter } from 'next/font/google'
-import type { Metadata } from "next";
-import './globals.css'
+import "./globals.css"
+import { ReactNode } from 'react'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ["latin"] })
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export const metadata: Metadata = {
+  title: "Recipe AI - Generate Delicious Recipes with AI",
+  description: "Transform your ingredients into delicious recipes with the power of AI. Plan meals, save favorites, and cook with confidence.",
+}
+
+interface RootLayoutProps {
+  children: ReactNode
+}
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        {children}
+        <Providers>
+          {children}
+        </Providers>
         <Toaster position="top-center" richColors />
       </body>
     </html>
   )
 }
-
-export const metadata: Metadata = {
-  title: "Recipe AI - Generate Delicious Recipes with AI",
-  description: "Transform your ingredients into delicious recipes with the power of AI. Plan meals, save favorites, and cook with confidence.",
-  keywords: ["recipe generator", "AI recipes", "meal planning", "cooking", "food"],
-  authors: [{ name: "Your Name" }],
-  openGraph: {
-    title: "Recipe AI - AI-Powered Recipe Generator",
-    description: "Generate personalized recipes from your ingredients using AI",
-    type: "website",
-    locale: "en_US",
-  },
-};

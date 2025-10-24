@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Clock, Users, ChefHat, Loader2 } from 'lucide-react'
+import { Plus, Clock, Users, ChefHat } from 'lucide-react'
 import Link from 'next/link'
 import { RecipeFilters } from '@/components/recipe-filters'
 import { RecipeGridSkeleton } from '@/components/recipe-skeleton'
-import { Skeleton } from '@/components/ui/skeleton'
 
 interface Recipe {
   id: string
@@ -26,28 +26,20 @@ interface Recipe {
 }
 
 export default function RecipesPage() {
-  const [recipes, setRecipes] = useState<Recipe[]>([])
-  const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCuisine, setSelectedCuisine] = useState('all')
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   const [sortBy, setSortBy] = useState('newest')
-  
-  // Get unique cuisines
-  const cuisines = Array.from(
-    new Set(recipes.map(r => r.cuisine_type).filter(Boolean))
-  ).sort() as string[]
 
-  // Fetch recipes
-  useEffect(() => {
-    async function fetchRecipes() {
+  // Fetch recipes with React Query
+  const { data: recipes = [], isLoading } = useQuery({
+    queryKey: ['recipes'],
+    queryFn: async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       
-      if (!user) return
+      if (!user) return []
 
       const { data, error } = await supabase
         .from('recipes')
@@ -55,17 +47,26 @@ export default function RecipesPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
 
-      if (!error && data) {
-        setRecipes(data)
+      if (error) {
+        console.error('Error fetching recipes:', error)
+        return []
       }
-      setIsLoading(false)
-    }
 
-    fetchRecipes()
-  }, [])
+      return (data || []) as Recipe[]
+    },
+    staleTime: 60 * 1000, // Cache for 1 minute
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+  })
+
+  // Get unique cuisines
+  const cuisines = useMemo(() => {
+    return Array.from(
+      new Set(recipes.map(r => r.cuisine_type).filter(Boolean))
+    ).sort() as string[]
+  }, [recipes])
 
   // Apply filters and sorting
-  useEffect(() => {
+  const filteredRecipes = useMemo(() => {
     let filtered = [...recipes]
 
     // Search filter
@@ -116,23 +117,23 @@ export default function RecipesPage() {
         break
     }
 
-    setFilteredRecipes(filtered)
+    return filtered
   }, [recipes, searchQuery, selectedCuisine, showFavoritesOnly, sortBy])
 
- if (isLoading) {
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <Skeleton className="h-9 w-48 mb-2" />
-          <Skeleton className="h-5 w-64" />
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div className="space-y-2">
+            <div className="h-9 w-48 bg-gray-200 rounded animate-pulse" />
+            <div className="h-5 w-64 bg-gray-200 rounded animate-pulse" />
+          </div>
+          <div className="h-10 w-40 bg-gray-200 rounded animate-pulse" />
         </div>
-        <Skeleton className="h-10 w-40" />
+        <RecipeGridSkeleton />
       </div>
-      <RecipeGridSkeleton />
-    </div>
-  )
-}
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -175,7 +176,7 @@ export default function RecipesPage() {
           <CardContent>
             <ChefHat className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">
-              You haven't created any recipes yet.
+              You haven&apos;t created any recipes yet.
             </p>
             <Button asChild>
               <Link href="/recipes/generate">Create Your First Recipe</Link>
