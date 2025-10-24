@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { getUser } from "@/lib/actions/auth";
 import {
   Card,
   CardContent,
@@ -15,59 +14,67 @@ import Link from "next/link";
 import { ChefHat, Calendar, BookOpen, Heart, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
-  const [recipeCount, setRecipeCount] = useState(0)
-  const [favoriteCount, setFavoriteCount] = useState(0)
-  const [mealPlanCount, setMealPlanCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
+  // Define query function
+  const fetchDashboardData = async () => {
+    const supabase = createClient()
 
-  useEffect(() => {
-    async function fetchData() {
-      const supabase = createClient()
-      
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+    // Get logged-in user
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('No user logged in')
 
-      setUser(user)
-
-      // Get counts
-      const { count: recipes } = await supabase
-        .from('recipes')
+    // Fetch counts in parallel
+    const [recipesRes, favoritesRes, mealPlansRes] = await Promise.all([
+      supabase.from('recipes')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id),
+      supabase.from('recipes')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-
-      const { count: favorites } = await supabase
-        .from('recipes')
+        .eq('is_favorite', true),
+      supabase.from('meal_plans')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('is_favorite', true)
+        .gte('planned_date', new Date().toISOString().split('T')[0]),
+    ])
 
-      const { count: mealPlans } = await supabase
-        .from('meal_plans')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('planned_date', new Date().toISOString().split('T')[0])
-
-      setRecipeCount(recipes || 0)
-      setFavoriteCount(favorites || 0)
-      setMealPlanCount(mealPlans || 0)
-      setIsLoading(false)
+    return {
+      user,
+      recipeCount: recipesRes.count ?? 0,
+      favoriteCount: favoritesRes.count ?? 0,
+      mealPlanCount: mealPlansRes.count ?? 0,
     }
+  }
 
-    fetchData()
-  }, [])
+  // Use React Query
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: fetchDashboardData,
+    refetchOnWindowFocus: false,
+  })
 
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-[400px]">
-      <Loader2 className="h-8 w-8 animate-spin" />
-    </div>
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
+
+  if (isError || !data) {
+    return (
+      <div className="text-center text-red-500 py-10">
+        Failed to load dashboard data.
+      </div>
+    )
+  }
+
+  const { user, recipeCount, favoriteCount, mealPlanCount } = data
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">
-          Welcome back, {user!.user_metadata.full_name || "Chef"}! 👋
+          Welcome back, {user.user_metadata.full_name || "Chef"}! 👋
         </h1>
         <p className="text-muted-foreground mt-2">
           Ready to create some delicious recipes?
@@ -81,7 +88,7 @@ export default function DashboardPage() {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{recipeCount || 0}</div>
+            <div className="text-2xl font-bold">{recipeCount}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Your recipe collection
             </p>
@@ -94,7 +101,7 @@ export default function DashboardPage() {
             <Heart className="h-4 w-4 text-red-500 fill-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{favoriteCount || 0}</div>
+            <div className="text-2xl font-bold">{favoriteCount}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Your favorite recipes
             </p>
@@ -107,7 +114,7 @@ export default function DashboardPage() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mealPlanCount || 0}</div>
+            <div className="text-2xl font-bold">{mealPlanCount}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Upcoming meals planned
             </p>
@@ -129,6 +136,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      {/* Getting Started Section */}
       <Card>
         <CardHeader>
           <CardTitle>Getting Started</CardTitle>
@@ -149,6 +157,7 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
+
           <div className="flex items-start gap-4">
             <div className="bg-blue-100 p-3 rounded-lg">
               <BookOpen className="h-6 w-6 text-blue-600" />
@@ -160,6 +169,7 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
+
           <div className="flex items-start gap-4">
             <div className="bg-green-100 p-3 rounded-lg">
               <Calendar className="h-6 w-6 text-green-600" />
@@ -174,5 +184,5 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
