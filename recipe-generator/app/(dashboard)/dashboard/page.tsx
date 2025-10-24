@@ -93,7 +93,9 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <Link href="/recipes/generate">Generate Recipe</Link>
+              <Link href="/recipes/generate" prefetch={true}>
+                Generate Recipe
+              </Link>
             </Button>
           </CardContent>
         </Card>
