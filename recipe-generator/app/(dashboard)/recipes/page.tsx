@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +10,7 @@ import { Plus, Clock, Users, ChefHat } from 'lucide-react'
 import Link from 'next/link'
 import { RecipeFilters } from '@/components/recipe-filters'
 import { RecipeGridSkeleton } from '@/components/recipe-skeleton'
+import { startOfWeek, addDays, format } from 'date-fns'
 
 interface Recipe {
   id: string
@@ -26,6 +27,8 @@ interface Recipe {
 }
 
 export default function RecipesPage() {
+  const queryClient = useQueryClient()
+  
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCuisine, setSelectedCuisine] = useState('all')
@@ -54,9 +57,80 @@ export default function RecipesPage() {
 
       return (data || []) as Recipe[]
     },
-    staleTime: 60 * 1000, // Cache for 1 minute
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   })
+
+  // Prefetch meal plan data
+  useEffect(() => {
+    const prefetchMealPlans = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+      const weekEnd = addDays(currentWeekStart, 6)
+      const startDate = format(currentWeekStart, 'yyyy-MM-dd')
+      const endDate = format(weekEnd, 'yyyy-MM-dd')
+
+      await queryClient.prefetchQuery({
+        queryKey: ['mealPlans', currentWeekStart, user.id],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('meal_plans')
+            .select(`
+              *,
+              recipes (
+                id,
+                name,
+                cuisine_type,
+                difficulty,
+                cooking_time,
+                prep_time,
+                servings
+              )
+            `)
+            .eq('user_id', user.id)
+            .gte('planned_date', startDate)
+            .lte('planned_date', endDate)
+          return data || []
+        },
+        staleTime: 3 * 60 * 1000,
+      })
+    }
+
+    prefetchMealPlans()
+  }, [queryClient])
+
+  // Prefetch individual recipe pages on hover
+  const prefetchRecipe = async (recipeId: string) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    await queryClient.prefetchQuery({
+      queryKey: ['recipe', recipeId],
+      queryFn: async () => {
+        const [recipeRes, ingredientsRes] = await Promise.all([
+          supabase
+            .from('recipes')
+            .select('*')
+            .eq('id', recipeId)
+            .eq('user_id', user.id)
+            .single(),
+          supabase
+            .from('recipe_ingredients')
+            .select(`
+              *,
+              ingredients (id, name)
+            `)
+            .eq('recipe_id', recipeId)
+        ])
+        return { recipe: recipeRes.data, ingredients: ingredientsRes.data }
+      },
+      staleTime: 5 * 60 * 1000,
+    })
+  }
 
   // Get unique cuisines
   const cuisines = useMemo(() => {
@@ -69,7 +143,6 @@ export default function RecipesPage() {
   const filteredRecipes = useMemo(() => {
     let filtered = [...recipes]
 
-    // Search filter
     if (searchQuery) {
       filtered = filtered.filter(recipe =>
         recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -77,17 +150,14 @@ export default function RecipesPage() {
       )
     }
 
-    // Cuisine filter
     if (selectedCuisine !== 'all') {
       filtered = filtered.filter(recipe => recipe.cuisine_type === selectedCuisine)
     }
 
-    // Favorites filter
     if (showFavoritesOnly) {
       filtered = filtered.filter(recipe => recipe.is_favorite)
     }
 
-    // Sorting
     switch (sortBy) {
       case 'newest':
         filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -208,6 +278,7 @@ export default function RecipesPage() {
               key={recipe.id}
               href={`/recipes/${recipe.id}`}
               className="group"
+              onMouseEnter={() => prefetchRecipe(recipe.id)}
             >
               <Card className="h-full transition-all hover:shadow-lg hover:scale-[1.02]">
                 <CardHeader>
@@ -224,7 +295,6 @@ export default function RecipesPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Badges */}
                   <div className="flex flex-wrap gap-2">
                     {recipe.cuisine_type && (
                       <Badge variant="secondary" className="text-xs">
@@ -239,7 +309,6 @@ export default function RecipesPage() {
                     )}
                   </div>
 
-                  {/* Time & Servings */}
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     {(recipe.prep_time || recipe.cooking_time) && (
                       <div className="flex items-center gap-1">
@@ -257,7 +326,6 @@ export default function RecipesPage() {
                     )}
                   </div>
 
-                  {/* AI Badge */}
                   {recipe.ai_generated && (
                     <Badge variant="outline" className="text-xs">
                       ✨ AI Generated

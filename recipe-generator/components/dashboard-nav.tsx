@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -20,6 +22,7 @@ import { ChefHat, Home, Calendar, BookOpen, User, LogOut, Menu } from 'lucide-re
 import { signOut } from '@/lib/actions/auth'
 import { User as SupabaseUser } from '@supabase/supabase-js'
 import { useTransition } from 'react'
+import { format, startOfWeek, addDays } from 'date-fns'
 
 interface DashboardNavProps {
   user: SupabaseUser
@@ -27,6 +30,7 @@ interface DashboardNavProps {
 
 export function DashboardNav({ user }: DashboardNavProps) {
   const pathname = usePathname()
+  const queryClient = useQueryClient()
   const [isPending, startTransition] = useTransition()
 
   const navItems = [
@@ -39,6 +43,61 @@ export function DashboardNav({ user }: DashboardNavProps) {
     startTransition(async () => {
       await signOut()
     })
+  }
+
+  // Prefetch page data on hover
+  const prefetchPage = async (href: string) => {
+    const supabase = createClient()
+
+    if (href === '/dashboard') {
+      await queryClient.prefetchQuery({
+        queryKey: ['dashboard-stats'],
+        queryFn: async () => {
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) throw new Error('No user')
+
+          const [recipesRes, favoritesRes, mealPlansRes] = await Promise.all([
+            supabase.from('recipes').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+            supabase.from('recipes').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('is_favorite', true),
+            supabase.from('meal_plans').select('*', { count: 'exact', head: true }).eq('user_id', user.id).gte('planned_date', new Date().toISOString().split('T')[0]),
+          ])
+
+          return {
+            user,
+            recipeCount: recipesRes.count ?? 0,
+            favoriteCount: favoritesRes.count ?? 0,
+            mealPlanCount: mealPlansRes.count ?? 0,
+          }
+        },
+        staleTime: 2 * 60 * 1000,
+      })
+    } else if (href === '/recipes') {
+      await queryClient.prefetchQuery({
+        queryKey: ['recipes'],
+        queryFn: async () => {
+          const { data } = await supabase.from('recipes').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+          return data || []
+        },
+        staleTime: 60 * 1000,
+      })
+    } else if (href === '/meal-plan') {
+      const currentWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+      const weekEnd = addDays(currentWeekStart, 6)
+
+      await queryClient.prefetchQuery({
+        queryKey: ['mealPlans', currentWeekStart, user.id],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('meal_plans')
+            .select(`*, recipes (*)`)
+            .eq('user_id', user.id)
+            .gte('planned_date', format(currentWeekStart, 'yyyy-MM-dd'))
+            .lte('planned_date', format(weekEnd, 'yyyy-MM-dd'))
+          return data || []
+        },
+        staleTime: 3 * 60 * 1000,
+      })
+    }
   }
 
   return (
@@ -60,6 +119,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onMouseEnter={() => prefetchPage(item.href)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive
                       ? 'bg-orange-50 text-orange-600'

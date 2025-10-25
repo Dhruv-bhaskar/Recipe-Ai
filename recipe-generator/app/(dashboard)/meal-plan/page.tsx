@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Copy } from "lucide-react"
 import { CopyWeekDialog } from "@/components/copy-week-dialog"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -39,6 +39,8 @@ interface MealPlan {
   recipes: Recipe
 }
 
+type MealType = "breakfast" | "lunch" | "dinner" | "snack"
+
 export default function MealPlanPage() {
   const [currentWeekStart, setCurrentWeekStart] = useState(
     startOfWeek(new Date(), { weekStartsOn: 1 })
@@ -46,22 +48,15 @@ export default function MealPlanPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [copyDialogOpen, setCopyDialogOpen] = useState(false)
-  const [selectedDate, setSelectedDate] = useState('')
-  const [selectedMealType, setSelectedMealType] = useState<
-    "breakfast" | "lunch" | "dinner" | "snack"
-  >("breakfast")
+  const [selectedDate, setSelectedDate] = useState<string>('')
+  const [selectedMealType, setSelectedMealType] = useState<MealType>("breakfast")
 
   const queryClient = useQueryClient()
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i))
-  const mealTypes: Array<"breakfast" | "lunch" | "dinner" | "snack"> = [
-    "breakfast",
-    "lunch",
-    "dinner",
-    "snack",
-  ]
+  const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snack"]
 
-  const mealTypeLabels = {
+  const mealTypeLabels: Record<MealType, string> = {
     breakfast: "🍳 Breakfast",
     lunch: "🍱 Lunch",
     dinner: "🍽️ Dinner",
@@ -91,14 +86,14 @@ export default function MealPlanPage() {
       .select("id, name, cuisine_type, difficulty, cooking_time, prep_time, servings")
       .eq("user_id", user!.id)
 
-    return data ?? []
+    return (data ?? []) as Recipe[]
   }
 
   const { data: recipes = [] } = useQuery({
     queryKey: ['recipes', user?.id],
     queryFn: fetchRecipes,
     enabled: !!user,
-    staleTime: 5 * 60 * 1000, // 5 min cache
+    staleTime: 5 * 60 * 1000,
   })
 
   // ---------- Fetch Meal Plans ----------
@@ -126,7 +121,7 @@ export default function MealPlanPage() {
       .gte("planned_date", startDate)
       .lte("planned_date", endDate)
 
-    return data ?? []
+    return (data ?? []) as MealPlan[]
   }
 
   const {
@@ -136,8 +131,53 @@ export default function MealPlanPage() {
     queryKey: ['mealPlans', currentWeekStart, user?.id],
     queryFn: fetchMealPlans,
     enabled: !!user,
-    staleTime: 1000 * 60 * 3, // cache 3 min
+    staleTime: 1000 * 60 * 3,
   })
+
+  // Prefetch adjacent weeks
+  useEffect(() => {
+    if (!user) return
+
+    const prefetchAdjacentWeeks = async () => {
+      const supabase = createClient()
+      const nextWeek = addWeeks(currentWeekStart, 1)
+      const prevWeek = subWeeks(currentWeekStart, 1)
+
+      // Prefetch next week
+      const nextWeekEnd = addDays(nextWeek, 6)
+      await queryClient.prefetchQuery({
+        queryKey: ['mealPlans', nextWeek, user.id],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('meal_plans')
+            .select(`*, recipes (*)`)
+            .eq('user_id', user.id)
+            .gte('planned_date', format(nextWeek, 'yyyy-MM-dd'))
+            .lte('planned_date', format(nextWeekEnd, 'yyyy-MM-dd'))
+          return data || []
+        },
+        staleTime: 3 * 60 * 1000,
+      })
+
+      // Prefetch previous week
+      const prevWeekEnd = addDays(prevWeek, 6)
+      await queryClient.prefetchQuery({
+        queryKey: ['mealPlans', prevWeek, user.id],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('meal_plans')
+            .select(`*, recipes (*)`)
+            .eq('user_id', user.id)
+            .gte('planned_date', format(prevWeek, 'yyyy-MM-dd'))
+            .lte('planned_date', format(prevWeekEnd, 'yyyy-MM-dd'))
+          return data || []
+        },
+        staleTime: 3 * 60 * 1000,
+      })
+    }
+
+    prefetchAdjacentWeeks()
+  }, [currentWeekStart, user, queryClient])
 
   // ---------- Mutations ----------
   const removeMutation = useMutation({
@@ -151,12 +191,11 @@ export default function MealPlanPage() {
     mutationFn: ({ id, isCompleted }: { id: string; isCompleted: boolean }) =>
       toggleMealComplete(id, isCompleted),
     onMutate: async ({ id, isCompleted }) => {
-      // optimistic update
       await queryClient.cancelQueries({ queryKey: ['mealPlans'] })
       const prevData = queryClient.getQueryData<MealPlan[]>(['mealPlans', currentWeekStart, user?.id])
       if (prevData) {
         queryClient.setQueryData(['mealPlans', currentWeekStart, user?.id], prevData.map(mp =>
-          mp.id === id ? { ...mp, is_completed: isCompleted } : mp
+          mp.id === id ? { ...mp, is_completed: !isCompleted } : mp
         ))
       }
       return { prevData }
@@ -172,16 +211,31 @@ export default function MealPlanPage() {
   })
 
   // ---------- Helpers ----------
-  const getMealForSlot = (date: Date, mealType: string) => {
+  const getMealForSlot = (date: Date, mealType: MealType) => {
     const dateStr = format(date, "yyyy-MM-dd")
-    return mealPlans.find((mp: { planned_date: string; meal_type: string }) => mp.planned_date === dateStr && mp.meal_type === mealType)
+    return mealPlans.find(mp => mp.planned_date === dateStr && mp.meal_type === mealType)
   }
 
   const goToToday = () => {
     setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))
   }
 
-  // ---------- UI ----------
+  // Prefetch recipe details on hover
+  const prefetchRecipe = async (recipeId: string) => {
+    const supabase = createClient()
+    await queryClient.prefetchQuery({
+      queryKey: ['recipe', recipeId],
+      queryFn: async () => {
+        const [recipeRes, ingredientsRes] = await Promise.all([
+          supabase.from('recipes').select('*').eq('id', recipeId).single(),
+          supabase.from('recipe_ingredients').select(`*, ingredients (*)`).eq('recipe_id', recipeId)
+        ])
+        return { recipe: recipeRes.data, ingredients: ingredientsRes.data }
+      },
+      staleTime: 5 * 60 * 1000,
+    })
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -261,6 +315,7 @@ export default function MealPlanPage() {
                             <Link
                               href={`/recipes/${meal.recipe_id}`}
                               className="text-sm font-medium hover:text-orange-600 line-clamp-2 flex-1"
+                              onMouseEnter={() => prefetchRecipe(meal.recipe_id)}
                             >
                               {meal.recipes.name}
                             </Link>

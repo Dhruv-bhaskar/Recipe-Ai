@@ -1,7 +1,8 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
+import { useEffect } from 'react'
 import {
   Card,
   CardContent,
@@ -14,6 +15,8 @@ import Link from "next/link";
 import { ChefHat, Calendar, BookOpen, Heart, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
+  const queryClient = useQueryClient()
+
   // Define query function
   const fetchDashboardData = async () => {
     const supabase = createClient()
@@ -50,7 +53,32 @@ export default function DashboardPage() {
     queryKey: ['dashboard-stats'],
     queryFn: fetchDashboardData,
     refetchOnWindowFocus: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   })
+
+  // Prefetch recipes page data on mount
+  useEffect(() => {
+    const prefetchRecipes = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await queryClient.prefetchQuery({
+        queryKey: ['recipes'],
+        queryFn: async () => {
+          const { data } = await supabase
+            .from('recipes')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+          return data || []
+        },
+        staleTime: 60 * 1000,
+      })
+    }
+
+    prefetchRecipes()
+  }, [queryClient])
 
   if (isLoading) {
     return (
@@ -141,7 +169,7 @@ export default function DashboardPage() {
         <CardHeader>
           <CardTitle>Getting Started</CardTitle>
           <CardDescription>
-            Here's what you can do with Recipe AI
+            Here&apos;s what you can do with Recipe AI
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -177,7 +205,7 @@ export default function DashboardPage() {
             <div>
               <h3 className="font-semibold">Plan Your Meals</h3>
               <p className="text-sm text-muted-foreground">
-                Schedule recipes for the week and never wonder what's for dinner
+                Schedule recipes for the week and never wonder what&apos;s for dinner
               </p>
             </div>
           </div>
