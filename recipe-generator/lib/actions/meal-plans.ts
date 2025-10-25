@@ -238,3 +238,64 @@ export async function copyWeek(sourceStartDate: string, targetStartDate: string)
     return { error: 'Failed to copy week' }
   }
 }
+
+export async function addCustomMeal(
+  customName: string,
+  date: string,
+  mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+) {
+  try {
+    const supabase = await createClient()
+    
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { error: 'Not authenticated' }
+    }
+
+    // Check if meal already exists for this date/type
+    const { data: existing } = await supabase
+      .from('meal_plans')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('planned_date', date)
+      .eq('meal_type', mealType)
+      .single()
+
+    if (existing) {
+      // Update existing meal plan
+      const { error } = await supabase
+        .from('meal_plans')
+        .update({ 
+          custom_meal_name: customName,
+          recipe_id: null // Clear recipe_id if it was set
+        })
+        .eq('id', existing.id)
+
+      if (error) {
+        console.error('Update custom meal error:', error)
+        return { error: 'Failed to update meal' }
+      }
+    } else {
+      // Create new meal plan
+      const { error } = await supabase
+        .from('meal_plans')
+        .insert({
+          user_id: user.id,
+          custom_meal_name: customName,
+          planned_date: date,
+          meal_type: mealType,
+        })
+
+      if (error) {
+        console.error('Create custom meal error:', error)
+        return { error: 'Failed to add meal' }
+      }
+    }
+
+    revalidatePath('/meal-plan')
+    return { success: true }
+  } catch (error: unknown) {
+    console.error('Add custom meal error:', error)
+    return { error: 'Failed to add meal' }
+  }
+}

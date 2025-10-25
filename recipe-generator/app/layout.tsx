@@ -8,7 +8,7 @@ import { ReactNode } from 'react'
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Recipe AI - Generate Delicious Recipes with AI",
+  title: "ChefAI - Generate Delicious Recipes with AI",
   description: "Transform your ingredients into delicious recipes with the power of AI. Plan meals, save favorites, and cook with confidence.",
 }
 

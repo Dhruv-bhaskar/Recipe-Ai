@@ -106,7 +106,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
         <div className="flex items-center gap-6">
           <Link href="/dashboard" className="flex items-center gap-2">
             <ChefHat className="h-6 w-6 text-orange-500" />
-            <span className="font-bold text-xl">Recipe AI</span>
+            <span className="font-bold text-xl">ChefAI</span>
           </Link>
           
           {/* Desktop Navigation */}
