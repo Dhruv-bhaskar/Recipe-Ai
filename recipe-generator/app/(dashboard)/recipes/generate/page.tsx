@@ -139,7 +139,6 @@ export default function GenerateRecipePage() {
                 <SelectItem value="mexican">Mexican</SelectItem>
                 <SelectItem value="japanese">Japanese</SelectItem>
                 <SelectItem value="thai">Thai</SelectItem>
-                <SelectItem value="mediterranean">Mediterranean</SelectItem>
                 <SelectItem value="american">American</SelectItem>
               </SelectContent>
             </Select>
