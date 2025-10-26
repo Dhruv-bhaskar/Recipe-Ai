@@ -65,8 +65,8 @@ export default function GenerateRecipePage() {
       setError(result.error)
     } else if (result.recipe) {
       // Redirect to the generated recipe
-      toast.success('Meal generated successfully!')
       router.push(`/recipes/${result.recipe.id}`)
+      toast.success('Meal generated successfully!')
     }
   }
 
