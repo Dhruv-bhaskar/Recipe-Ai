@@ -1,4 +1,4 @@
-'use client'
+  'use client'
 
 import { signUp, type FormState } from '@/lib/actions/auth'
 import { Button } from '@/components/ui/button'
@@ -27,7 +27,7 @@ export default function SignUpPage() {
   const [state, formAction] = useFormState(signUp, initialState)
 
   return (
-    <Card>
+    <Card className='bg-gradient-to-br from-primary/10 to-secondary/20 border border-stone-300'>
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold">Create an account</CardTitle>
         <CardDescription>
@@ -45,26 +45,29 @@ export default function SignUpPage() {
           <div className="space-y-2">
             <Label htmlFor="fullName">Full Name</Label>
             <Input
+              className='border-1 border-gray-400/40 shadow-sm'
               id="fullName"
               name="fullName"
               type="text"
-              placeholder="John Doe"
+              placeholder="Enter your name"
               required
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
+               className='border-1 border-gray-400/40 shadow-sm'
               id="email"
               name="email"
               type="email"
-              placeholder="name@example.com"
+              placeholder="Enter email"
               required
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 mb-4">
             <Label htmlFor="password">Password</Label>
             <Input
+               className='border-1 border-gray-400/40 shadow-sm'
               id="password"
               name="password"
               type="password"

@@ -27,7 +27,7 @@ export default function LoginPage() {
   const [state, formAction] = useFormState(signIn, initialState)
 
   return (
-    <Card>
+    <Card className='bg-gradient-to-br from-primary/10 to-secondary/20 border border-stone-300'>
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
         <CardDescription>
@@ -45,16 +45,18 @@ export default function LoginPage() {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
+               className='border-1 border-gray-400/40 shadow-sm'
               id="email"
               name="email"
               type="email"
-              placeholder="name@example.com"
+              placeholder="Enter email"
               required
             />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-2 mb-4">
             <Label htmlFor="password">Password</Label>
             <Input
+               className='border-1 border-gray-400/40 shadow-sm'
               id="password"
               name="password"
               type="password"

@@ -1,5 +1,4 @@
-// app/page.tsx or pages/index.tsx (depending on your Next.js structure)
-'use client' // Add this if using app directory
+'use client' 
 
 import { Button } from '@/components/ui/button'
 import { ChefHat, Sparkles, Calendar, Heart, Search, Smartphone, PlusCircle } from 'lucide-react'
@@ -15,7 +14,7 @@ interface FeatureCardProps {
 
 const FeatureCard = ({ icon: Icon, title, description }: FeatureCardProps) => {
   return (
-    <div className="p-6 hover:shadow-xl transition-all duration-300 bg-card border-border group cursor-pointer rounded-lg border shadow-sm">
+    <div className="p-6 hover:shadow-xl transition-all duration-300 bg-card border-border group cursor-pointer rounded-lg border shadow-md bg-gradient-to-br from-primary/10 to-secondary/10">
       <div className="flex flex-col items-center text-center space-y-4">
         <div className="p-4 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
           <Icon className="h-8 w-8 text-primary" />
@@ -69,7 +68,7 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-background">
+      <section className="py-20 bg-gradient-to-br from-primary/15 to-secondary/12">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16 animate-fade-in">
             <h2 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
